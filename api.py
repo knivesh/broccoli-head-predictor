@@ -13,6 +13,7 @@ def get_device():
         device = torch.device('cpu')
     return device
 
+@functools.lru_cache(maxsize=1)
 def get_model():
     """Loads the model once and caches it for all subsequent requests."""
     device = get_device()
