@@ -70,12 +70,12 @@ async def upload_image(file: UploadFile = File(...)):
 
     return HTMLResponse(content="""<script>window.location.href = '/';</script>""")
 
-# @app.get("/image/")
-# async def serve_image():
-#     """Serves the latest image data (uploaded or predicted) as a JPEG stream."""
-#     global LATEST_IMAGE_DATA
+@app.get("/image/")
+async def serve_image():
+    """Serves the latest image data (uploaded or predicted) as a JPEG stream."""
+    global LATEST_IMAGE_DATA
 
-#     return StreamingResponse(io.BytesIO(LATEST_IMAGE_DATA), )
+    return StreamingResponse(io.BytesIO(LATEST_IMAGE_DATA), media_type="image/jpeg")
 
 if __name__=="__main__":
     import uvicorn
