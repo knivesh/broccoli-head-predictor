@@ -1,100 +1,184 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Broccoli Inference API</title>
+    <title>Broccoli Head Predictor API</title>
     <style>
+        /* General Layout and Reset */
         body { 
-            font-family: sans-serif; 
-            max-width: 800px; 
-            margin: auto; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            max-width: 900px; 
+            margin: 40px auto; 
             padding: 20px; 
             line-height: 1.6; 
-            background-color: #f4f4f9;
+            background-color: #f4f7f9;
+            color: #333;
         }
         h1 { 
-            color: #4CAF50; 
-            border-bottom: 2px solid #eee; 
-            padding-bottom: 10px; 
+            color: #2e7d32; /* Darker Green */
+            border-bottom: 3px solid #e0e0e0; 
+            padding-bottom: 15px; 
             text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 30px;
         }
+        h2 {
+            color: #555;
+            font-size: 1.5em;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        hr {
+            border: 0;
+            border-top: 1px solid #ddd;
+            margin: 30px 0;
+        }
+
+        /* Form Styling */
         form { 
-            margin-bottom: 20px; 
-            padding: 15px; 
-            border: 1px solid #ccc; 
-            border-radius: 5px; 
+            padding: 20px; 
+            border: 1px solid #e0e0e0; 
+            border-radius: 8px; 
             display: flex;
             align-items: center;
-            background-color: white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            justify-content: space-between;
+            background-color: #ffffff;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        label {
+            font-weight: bold;
+            color: #555;
+            margin-right: 15px;
+        }
+        input[type="file"] {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
         }
         button { 
-            background-color: #4CAF50; 
+            background-color: #4CAF50; /* Primary Green */
             color: white; 
-            padding: 10px 15px; 
+            padding: 10px 20px; 
             border: none; 
             border-radius: 4px; 
             cursor: pointer;
-            transition: background-color 0.3s;
-            margin-left: 10px;
+            transition: background-color 0.3s, transform 0.1s;
             font-weight: bold;
+            white-space: nowrap; /* Prevent button text wrapping */
         }
-        button:hover { background-color: #45a049; }
+        button:hover { 
+            background-color: #43a047; 
+            transform: translateY(-1px);
+        }
+
+        /* Prediction Button Specifics */
+        .predict-form {
+            justify-content: center;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
         .predict-form button {
-            background-color: #007bff;
-            margin: 0;
+            background-color: #007bff; /* Primary Blue */
+            font-size: 1.1em;
+            padding: 12px 30px;
         }
         .predict-form button:hover {
             background-color: #0056b3;
         }
+
+        /* Image and Messages */
+        #image_container {
+            text-align: center;
+            padding: 20px;
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0; 
+            border-radius: 8px;
+        }
+        .info-box {
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        /* Color coding for messages */
+        .info-box.default {
+             background-color: #e9ecef;
+             color: #555;
+        }
+        .info-box.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .info-box.warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+        
         img { 
             max-width: 100%; 
             height: auto; 
-            border: 3px solid #ddd; 
+            border: 5px solid #007bff; /* Blue border for prediction */
+            border-radius: 6px; 
             margin-top: 15px; 
-            border-radius: 5px;
-        }
-        #image_container {
-            text-align: center;
-            min-height: 200px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        .info-box {
-            background-color: #e9ecef;
-            padding: 10px;
-            border-radius: 4px;
-            margin-top: 15px;
+            box-shadow: 0 6px 10px rgba(0,0,0,0.1);
         }
     </style>
 </head>
 <body>
     <h1>🥦 Broccoli Head Predictor API</h1>
     
+    <script>
+        function clearPreviewOnSelect() {
+            const imgElement = document.getElementById('image_preview');
+            const messageElement = document.getElementById('image_message');
+            const predictForm = document.getElementById('predict_form');
+
+            // 1. Clear the image source (to an empty 1x1 GIF)
+            // This forces the browser to show a broken image icon (or nothing), 
+            // confirming the previous result is gone.
+            imgElement.src = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='; 
+            
+            // 2. Add a clear message to guide the user
+            messageElement.className = 'info-box warning';
+            messageElement.innerHTML = '✅ **New image selected!** Click **Upload & Preview** to load it.';
+
+            // 3. Hide the prediction button, as the new image is not yet uploaded
+            if (predictForm) {
+                predictForm.style.display = 'none';
+            }
+        }
+    </script>
+
     <h2>1. Upload Image</h2>
     <form action="/upload/" method="post" enctype="multipart/form-data">
         <label for="file">Choose Image:</label>
-        <input type="file" id="file" name="file" accept="image/*" required>
+        <input type="file" id="file" name="file" accept="image/*" required onchange="clearPreviewOnSelect()">
         <button type="submit">Upload & Preview</button>
     </form>
 
     <hr>
     
-    <h2>2. Result</h2>
+    <h2>2. Inference Result</h2>
     <div id="image_container">
+        
         {% if image_available %}
-            <form action="/predict/" method="post" class="predict-form">
+            <div id="image_message" class="info-box success">
+                Model Status: **Image loaded**. Click the button to run inference or upload a new image above.
+            </div>
+
+            <form id="predict_form" action="/predict/" method="post" class="predict-form">
                 <button type="submit">✨ Run Prediction</button>
             </form>
             
-            <div class="info-box">
-                Model Status: **{{ image_available }}**. Click the button to run inference.
-            </div>
-
-            <img src="/image/?t={{ cache_buster }}" alt="Uploaded or Predicted Image">
+            <img id="image_preview" src="/image/?t={{ cache_buster }}" alt="Uploaded or Predicted Image">
             
         {% else %}
-            <p>Upload an image in Step 1 to begin. The predicted image will appear here.</p>
+            <div id="image_message" class="info-box default">
+                Upload an image in Step 1 to begin. The processed image will appear here.
+            </div>
+            
         {% endif %}
     </div>
     
