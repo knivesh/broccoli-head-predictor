@@ -3,6 +3,7 @@ import functools
 import time
 import io
 from PIL import Image
+import numpy as np
 
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -21,6 +22,7 @@ def get_device():
         device = torch.accelerator.current_accelerator() 
     else:
         device = torch.device('cpu')
+    device = torch.device('cpu')
     return device
 
 @functools.lru_cache(maxsize=1)
@@ -36,6 +38,26 @@ def get_model():
     model.eval()
     return model
 
+EVAL_TRANSFORM = get_transform(train=False)
+
+def eval_transform(image_pil: Image.Image) -> torch.Tensor:
+    """
+    Converts PIL Image to the raw torch.uint8 tensor (C, H, W) format 
+    that the T.Compose pipeline expects after a read_image equivalent.
+    """
+    # 1. Convert PIL Image to NumPy array (H, W, C)
+    image_np = np.array(image_pil)
+
+    # 2. Convert NumPy array to PyTorch Tensor (H, W, C)
+    image_tensor_uint8 = torch.from_numpy(image_np)
+
+    # 3. Permute to (C, H, W) and ensure type is uint8 (like read_image)
+    if image_tensor_uint8.ndim == 3:
+        image_tensor_uint8 = image_tensor_uint8.permute(2, 0, 1).contiguous()
+
+    # 4. Apply your exact T.Compose logic (EVAL_TRANSFORM)
+    return EVAL_TRANSFORM(image_tensor_uint8)
+
 def predict_boxes_and_keypoints(image_pil: Image.Image):
     """
     Main function to orchestrate pre-processing, prediction, and drawing.
@@ -44,7 +66,6 @@ def predict_boxes_and_keypoints(image_pil: Image.Image):
     model = get_model() # Get the cached model
 
     # 1. Pre-processing
-    eval_transform = get_transform(train=False)
     input_tensor = eval_transform(image_pil)
     input_tensor = input_tensor[:3, ...] # Ensure RGB
 
@@ -96,6 +117,21 @@ async def serve_image():
     global LATEST_IMAGE_DATA
 
     return StreamingResponse(io.BytesIO(LATEST_IMAGE_DATA), media_type="image/jpeg")
+
+@app.post("/predict/")
+async def predict_image():
+    """Runs inference on the latest uploaded image."""
+    global LATEST_IMAGE_DATA
+
+    input_image = Image.open(io.BytesIO(LATEST_IMAGE_DATA)).convert("RGB")
+    output_image = predict_boxes_and_keypoints(input_image)
+
+    output_byte_array = io.BytesIO()
+    output_image.save(output_byte_array, format="JPEG")
+
+    LATEST_IMAGE_DATA = output_byte_array.getvalue()
+
+    return HTMLResponse(content="""<script>window.location.href = '/';</script>""")
 
 if __name__=="__main__":
     import uvicorn
