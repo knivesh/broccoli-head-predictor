@@ -2,7 +2,7 @@ import torch
 import functools
 import time
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -38,6 +38,7 @@ app = FastAPI(title="Broccoli Inference API")
 
 @app.get("/", response_class=HTMLResponse)
 async def home_page(request: Request):
+    """Renders the simple HTML frontend from the template."""
     current_time = int(time.time())
 
     return TEMPLATES.TemplateResponse(
@@ -48,6 +49,16 @@ async def home_page(request: Request):
                 "cache_buster": current_time
             }
         )
+
+@app.post("/upload/")
+async def upload_image(file: UploadFile = File(...)):
+    """Handles image upload and stores its raw bytes in memory."""
+    global LATEST_IMAGE_DATA
+
+    image_bytes = await file.read()
+    LATEST_IMAGE_DATA = image_bytes
+
+    return HTMLResponse(content="""<script>window.location.href = '/';</script>""")
 
 if __name__=="__main__":
     import uvicorn
