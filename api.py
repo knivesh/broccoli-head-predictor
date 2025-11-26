@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
-from utils import get_model_instance_segmentation
+from utils import get_model_instance_segmentation, get_transform, run_prediction, draw_predictions_on_image
 
 NUM_CLASSES = 2
 CHECKPOINT_PATH=r"models\experiment1_epoch_4.pth"
@@ -35,6 +35,26 @@ def get_model():
 
     model.eval()
     return model
+
+def predict_boxes_and_keypoints(image_pil: Image.Image):
+    """
+    Main function to orchestrate pre-processing, prediction, and drawing.
+    """
+    device = get_device()
+    model = get_model() # Get the cached model
+
+    # 1. Pre-processing
+    eval_transform = get_transform(train=False)
+    input_tensor = eval_transform(image_pil)
+    input_tensor = input_tensor[:3, ...] # Ensure RGB
+
+    # 2. Pure Prediction
+    pred = run_prediction(input_tensor, model, device)
+
+    # 3. Drawing and Visualization
+    output_image_pil = draw_predictions_on_image(input_tensor, pred)
+
+    return output_image_pil
 
 app = FastAPI(title="Broccoli Inference API")
 
