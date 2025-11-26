@@ -1,9 +1,11 @@
 import torch
 import functools
 import time
+import io
+from PIL import Image
 
 from fastapi import FastAPI, Request, UploadFile, File
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
 from utils import get_model_instance_segmentation
@@ -52,13 +54,28 @@ async def home_page(request: Request):
 
 @app.post("/upload/")
 async def upload_image(file: UploadFile = File(...)):
-    """Handles image upload and stores its raw bytes in memory."""
+    """Handles image upload, converts to JPEG, and stores its bytes."""
     global LATEST_IMAGE_DATA
 
     image_bytes = await file.read()
-    LATEST_IMAGE_DATA = image_bytes
+
+    img = Image.open(io.BytesIO(image_bytes))
+    if img.mode in ('RGBA', 'P'):
+        img = img.convert('RGB')
+
+    output_buffer = io.BytesIO()
+    img.save(output_buffer, format="JPEG")
+
+    LATEST_IMAGE_DATA = output_buffer.getvalue()
 
     return HTMLResponse(content="""<script>window.location.href = '/';</script>""")
+
+# @app.get("/image/")
+# async def serve_image():
+#     """Serves the latest image data (uploaded or predicted) as a JPEG stream."""
+#     global LATEST_IMAGE_DATA
+
+#     return StreamingResponse(io.BytesIO(LATEST_IMAGE_DATA), )
 
 if __name__=="__main__":
     import uvicorn
