@@ -1,2 +1,8 @@
 # Ignore Venv
 .venv/
+
+# Ignore cached files
+__pycache__/
+
+# Ignore Models
+models/
