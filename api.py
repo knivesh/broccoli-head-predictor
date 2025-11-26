@@ -1,9 +1,17 @@
 import torch
+import functools
+import time
+
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 
 from utils import get_model_instance_segmentation
 
 NUM_CLASSES = 2
 CHECKPOINT_PATH=r"models\experiment1_epoch_4.pth"
+TEMPLATES = Jinja2Templates(directory="templates")
+LATEST_IMAGE_DATA = None
 
 def get_device():
     """Dynamically determines the best device (CUDA/CPU) for the model."""
@@ -26,7 +34,22 @@ def get_model():
     model.eval()
     return model
 
+app = FastAPI(title="Broccoli Inference API")
+
+@app.get("/", response_class=HTMLResponse)
+async def home_page(request: Request):
+    current_time = int(time.time())
+
+    return TEMPLATES.TemplateResponse(
+            "index.html", 
+            {
+                "request": request, 
+                "image_available": LATEST_IMAGE_DATA is not None,
+                "cache_buster": current_time
+            }
+        )
+
 if __name__=="__main__":
-    model = get_model()
-    print(f"Model state: {model.training=}")
-    print(f"Model device: {next(model.parameters()).device}")
+    import uvicorn
+    get_model()
+    uvicorn.run(app, host="127.0.0.1", port=8000)
