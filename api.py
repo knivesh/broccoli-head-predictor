@@ -135,5 +135,4 @@ async def predict_image():
 
 if __name__=="__main__":
     import uvicorn
-    get_model()
     uvicorn.run(app, host="127.0.0.1", port=8000)
