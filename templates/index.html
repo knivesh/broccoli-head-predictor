@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Broccoli Inference API</title>
+    <style>
+        body { 
+            font-family: sans-serif; 
+            max-width: 800px; 
+            margin: auto; 
+            padding: 20px; 
+            line-height: 1.6; 
+            background-color: #f4f4f9;
+        }
+        h1 { 
+            color: #4CAF50; 
+            border-bottom: 2px solid #eee; 
+            padding-bottom: 10px; 
+            text-align: center;
+        }
+        form { 
+            margin-bottom: 20px; 
+            padding: 15px; 
+            border: 1px solid #ccc; 
+            border-radius: 5px; 
+            display: flex;
+            align-items: center;
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button { 
+            background-color: #4CAF50; 
+            color: white; 
+            padding: 10px 15px; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-left: 10px;
+            font-weight: bold;
+        }
+        button:hover { background-color: #45a049; }
+        .predict-form button {
+            background-color: #007bff;
+            margin: 0;
+        }
+        .predict-form button:hover {
+            background-color: #0056b3;
+        }
+        img { 
+            max-width: 100%; 
+            height: auto; 
+            border: 3px solid #ddd; 
+            margin-top: 15px; 
+            border-radius: 5px;
+        }
+        #image_container {
+            text-align: center;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .info-box {
+            background-color: #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🥦 Broccoli Head Predictor API</h1>
+    
+    <h2>1. Upload Image</h2>
+    <form action="/upload/" method="post" enctype="multipart/form-data">
+        <label for="file">Choose Image:</label>
+        <input type="file" id="file" name="file" accept="image/*" required>
+        <button type="submit">Upload & Preview</button>
+    </form>
+
+    <hr>
+    
+    <h2>2. Result</h2>
+    <div id="image_container">
+        {% if image_available %}
+            <form action="/predict/" method="post" class="predict-form">
+                <button type="submit">✨ Run Prediction</button>
+            </form>
+            
+            <div class="info-box">
+                Model Status: **{{ image_available }}**. Click the button to run inference.
+            </div>
+
+            <img src="/image/?t={{ cache_buster }}" alt="Uploaded or Predicted Image">
+            
+        {% else %}
+            <p>Upload an image in Step 1 to begin. The predicted image will appear here.</p>
+        {% endif %}
+    </div>
+    
+</body>
+</html>
