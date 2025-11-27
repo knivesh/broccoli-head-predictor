@@ -5,6 +5,7 @@ import io
 import os
 from PIL import Image
 import numpy as np
+from urllib.parse import quote_plus, unquote_plus
 
 from fastapi import FastAPI, Request, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -97,12 +98,17 @@ async def home_page(request: Request):
     """Renders the simple HTML frontend from the template."""
     current_time = int(time.time())
 
+    error_message = request.query_params.get("error")
+    if error_message:
+        error_message = unquote_plus(error_message)
+
     return TEMPLATES.TemplateResponse(
             "index.html", 
             {
                 "request": request, 
                 "image_available": LATEST_IMAGE_DATA is not None,
-                "cache_buster": current_time
+                "cache_buster": current_time,
+                "error_message": error_message
             }
         )
 
@@ -113,7 +119,9 @@ async def upload_image(file: UploadFile = File(...)):
 
     # Edge Case: Check for file type/MIME type (Restricted to PNG)
     if file.content_type != "image/png":
-        raise HTTPException(status_code=400, detail=f"Only PNG image files are allowed. Received: {file.content_type}")
+        error_msg = "🚫 Upload Failed: Only PNG image files are allowed."
+        encoded_msg = quote_plus(error_msg)
+        return HTMLResponse(content=f"""<script>window.location.href = '/?error={encoded_msg}';</script>""")
 
     try:
         image_bytes = await file.read()
@@ -132,8 +140,9 @@ async def upload_image(file: UploadFile = File(...)):
         LATEST_IMAGE_DATA = output_buffer.getvalue()
 
     except Exception as e:
-        print(f"Error processing image upload: {e}")
-        raise HTTPException(status_code=500, detail="Could not process the uploaded PNG image. Check file integrity.")
+        error_msg = f"❌ Processing Failed: Could not process the image. Error: {str(e)}"
+        encoded_msg = quote_plus(error_msg)
+        return HTMLResponse(content=f"""<script>window.location.href = '/?error={encoded_msg}';</script>""")
 
     return HTMLResponse(content="""<script>window.location.href = '/';</script>""")
 

@@ -9,7 +9,7 @@ from torchvision.utils import draw_bounding_boxes
 from torchvision.transforms import functional as T_F
 from torchvision.transforms import v2 as T
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 SCORE_THRESHOLD = 0.8
 NMS_THRESHOLD = 0.3
@@ -79,12 +79,27 @@ def draw_predictions_on_image(image_tensor: torch.Tensor, pred: dict) -> Image.I
     if len(pred["boxes"]) == 0:
         output_image_pil = T_F.to_pil_image(image_to_draw)
         draw = ImageDraw.Draw(output_image_pil)
+        try:
+            # Attempt to load a common font for a better look
+            font1 = ImageFont.truetype("arial.ttf", 25)
+            font2 = ImageFont.truetype("arial.ttf", 15)
+        except IOError:
+            # Fallback to default font if the system font is not found
+            font1 = ImageFont.load_default()
+            font2 = ImageFont.load_default()
+
         # Add warning text for the user
         draw.text(
             (10, 10), 
             f"No Broccoli detected (Score < {SCORE_THRESHOLD})", 
-            fill=(255, 100, 0), 
-            size=40 
+            fill=(255, 0, 0), # Bright Red for maximum warning contrast
+            font=font1
+        )
+        draw.text(
+            (10, 75), # Positioned below the main text
+            "Check image quality or try image from provided broccoli images.", 
+            fill=(100, 100, 100), # Dark Gray
+            font=font2
         )
         return output_image_pil
 
