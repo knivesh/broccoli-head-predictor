@@ -75,6 +75,19 @@ def draw_predictions_on_image(image_tensor: torch.Tensor, pred: dict) -> Image.I
     # 1. Prepare image tensor for drawing (0-255 uint8)
     image_to_draw = (255.0 * image_tensor).to(torch.uint8).cpu()
 
+    # Edge Case: Handle case where no boxes are found
+    if len(pred["boxes"]) == 0:
+        output_image_pil = T_F.to_pil_image(image_to_draw)
+        draw = ImageDraw.Draw(output_image_pil)
+        # Add warning text for the user
+        draw.text(
+            (10, 10), 
+            f"No Broccoli detected (Score < {SCORE_THRESHOLD})", 
+            fill=(255, 100, 0), 
+            size=40 
+        )
+        return output_image_pil
+
     final_scores = pred["scores"].cpu().numpy()
     pred_labels = [f"Broccoli: {score:.3f}" for score in final_scores]
     pred_boxes = pred["boxes"].long().cpu()

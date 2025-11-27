@@ -2,10 +2,11 @@ import torch
 import functools
 import time
 import io
+import os
 from PIL import Image
 import numpy as np
 
-from fastapi import FastAPI, Request, UploadFile, File
+from fastapi import FastAPI, Request, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
@@ -18,26 +19,31 @@ LATEST_IMAGE_DATA = None
 
 def get_device():
     """Using CPU only for inference at the moment"""
-    # if torch.accelerator.is_available():
-    #     device = torch.accelerator.current_accelerator() 
-    # else:
-    #     device = torch.device('cpu')
     device = torch.device('cpu')
+    print("Using CPU for all tensor operations.")
     return device
 
 @functools.lru_cache(maxsize=1)
 def get_model():
     """Loads the model once and caches it for all subsequent requests."""
-    device = get_device()
+    # Edge Case: Check if checkpoint exists
+    if not os.path.exists(CHECKPOINT_PATH):
+        raise RuntimeError(f"Model checkpoint not found at: {CHECKPOINT_PATH}")
 
-    model = get_model_instance_segmentation(NUM_CLASSES)
-    checkpoint = torch.load(CHECKPOINT_PATH, map_location=device)
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model.to(device)
+    try:
+        device = get_device()
+        model = get_model_instance_segmentation(NUM_CLASSES)
+        checkpoint = torch.load(CHECKPOINT_PATH, map_location=device)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model.to(device)
+        model.eval()
+        print(f"Broccoli Model successfully loaded on {device}.")
+        return model
+    except Exception as e:
+        print(f"FATAL: Error loading PyTorch model: {e}")
+        raise RuntimeError("Failed to initialize model. Check checkpoint and utils.py architecture.") from e
 
-    model.eval()
-    return model
-
+# Instantiate the callable transform object ONCE at startup
 EVAL_TRANSFORM = get_transform(train=False)
 
 def eval_transform(image_pil: Image.Image) -> torch.Tensor:
@@ -77,7 +83,14 @@ def predict_boxes_and_keypoints(image_pil: Image.Image):
 
     return output_image_pil
 
+# FASTAPI APP SETUP
 app = FastAPI(title="Broccoli Inference API")
+
+# Attempt to load model at startup for quick failure detection
+try:
+    get_model()
+except RuntimeError:
+    pass
 
 @app.get("/", response_class=HTMLResponse)
 async def home_page(request: Request):
@@ -98,16 +111,29 @@ async def upload_image(file: UploadFile = File(...)):
     """Handles image upload, converts to JPEG, and stores its bytes."""
     global LATEST_IMAGE_DATA
 
-    image_bytes = await file.read()
+    # Edge Case: Check for file type/MIME type (Restricted to PNG)
+    if file.content_type != "image/png":
+        raise HTTPException(status_code=400, detail=f"Only PNG image files are allowed. Received: {file.content_type}")
 
-    img = Image.open(io.BytesIO(image_bytes))
-    if img.mode in ('RGBA', 'P'):
-        img = img.convert('RGB')
+    try:
+        image_bytes = await file.read()
 
-    output_buffer = io.BytesIO()
-    img.save(output_buffer, format="JPEG")
+        # Edge Case: Check for empty file
+        if not image_bytes:
+            raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
-    LATEST_IMAGE_DATA = output_buffer.getvalue()
+        img = Image.open(io.BytesIO(image_bytes))
+        if img.mode in ('RGBA', 'P'):
+            img = img.convert('RGB')
+
+        output_buffer = io.BytesIO()
+        img.save(output_buffer, format="JPEG")
+
+        LATEST_IMAGE_DATA = output_buffer.getvalue()
+
+    except Exception as e:
+        print(f"Error processing image upload: {e}")
+        raise HTTPException(status_code=500, detail="Could not process the uploaded PNG image. Check file integrity.")
 
     return HTMLResponse(content="""<script>window.location.href = '/';</script>""")
 
@@ -116,6 +142,10 @@ async def serve_image():
     """Serves the latest image data (uploaded or predicted) as a JPEG stream."""
     global LATEST_IMAGE_DATA
 
+    # Edge Case: No image data uploaded yet
+    if LATEST_IMAGE_DATA is None:
+        raise HTTPException(status_code=404, detail="No image available to display. Please upload an image first.")
+
     return StreamingResponse(io.BytesIO(LATEST_IMAGE_DATA), media_type="image/jpeg")
 
 @app.post("/predict/")
@@ -123,13 +153,23 @@ async def predict_image():
     """Runs inference on the latest uploaded image."""
     global LATEST_IMAGE_DATA
 
-    input_image = Image.open(io.BytesIO(LATEST_IMAGE_DATA)).convert("RGB")
-    output_image = predict_boxes_and_keypoints(input_image)
+    # Edge Case: No image data to predict on
+    if LATEST_IMAGE_DATA is None:
+        raise HTTPException(status_code=404, detail="Cannot run prediction: No image has been uploaded.")
 
-    output_byte_array = io.BytesIO()
-    output_image.save(output_byte_array, format="JPEG")
+    try:
+        input_image = Image.open(io.BytesIO(LATEST_IMAGE_DATA)).convert("RGB")
+        output_image = predict_boxes_and_keypoints(input_image)
 
-    LATEST_IMAGE_DATA = output_byte_array.getvalue()
+        output_byte_array = io.BytesIO()
+        output_image.save(output_byte_array, format="JPEG")
+
+        LATEST_IMAGE_DATA = output_byte_array.getvalue()
+
+    except Exception as e:
+        print(f"Prediction execution failed: {e}")
+        # Re-raise as 500 internal server error
+        raise HTTPException(status_code=500, detail=f"Prediction failed due to an internal error: {e}")
 
     return HTMLResponse(content="""<script>window.location.href = '/';</script>""")
 
