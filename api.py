@@ -14,7 +14,7 @@ from fastapi.templating import Jinja2Templates
 from utils import get_model_instance_segmentation, get_transform, run_prediction, draw_predictions_on_image
 
 NUM_CLASSES = 2
-CHECKPOINT_PATH=r"models\experiment1_epoch_4.pth"
+CHECKPOINT_PATH="models/experiment1_epoch_4.pth"
 TEMPLATES = Jinja2Templates(directory="templates")
 LATEST_IMAGE_DATA = None
 
