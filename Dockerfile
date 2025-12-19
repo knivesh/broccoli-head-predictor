@@ -1,15 +1,29 @@
-FROM python:3.10-slim
+FROM python:3.10-slim AS build-stage
 
 WORKDIR /usr/src/app
 
 COPY requirements.txt .
-COPY api.py .
-COPY utils.py .
-COPY templates templates/
-COPY models models/
 
-RUN apt-get update
-RUN pip install --no-cache -r requirements.txt
+RUN python -m venv .venv
+RUN .venv/bin/pip install --no-cache-dir -r requirements.txt
+
+FROM python:3.10-slim
+
+WORKDIR /usr/src/app
+
+RUN adduser --disabled-password appuser
+
+COPY --from=build-stage --chown=appuser:appuser /usr/src/app/.venv /usr/src/app/.venv
+
+COPY --chown=appuser:appuser api.py utils.py ./
+COPY --chown=appuser:appuser templates/ ./templates/
+COPY --chown=appuser:appuser models/ ./models/
+
+ENV PATH="/usr/src/app/.venv/bin:$PATH"
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+USER appuser
 
 EXPOSE 8000
 
