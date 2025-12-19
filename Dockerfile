@@ -5,7 +5,10 @@ WORKDIR /usr/src/app
 COPY requirements.txt .
 
 RUN python -m venv .venv
-RUN .venv/bin/pip install --no-cache-dir -r requirements.txt
+RUN .venv/bin/pip install --no-cache-dir \
+    --index-url https://download.pytorch.org/whl/cpu \
+    --extra-index-url https://pypi.org/simple \
+    -r requirements.txt
 
 FROM python:3.10-slim
 
@@ -27,4 +30,4 @@ USER appuser
 
 EXPOSE 8000
 
-CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
